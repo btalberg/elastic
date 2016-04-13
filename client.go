@@ -132,6 +132,7 @@ type Client struct {
 	basicAuthPassword         string        // password for HTTP Basic Auth
 	sendGetBodyAs             string        // override for when sending a GET with a body
 	gzipEnabled               bool          // gzip compression enabled or disabled (default)
+	cookies                   []http.Cookie
 }
 
 // NewClient creates a new client to work with Elasticsearch.
@@ -202,6 +203,7 @@ func NewClient(options ...ClientOptionFunc) (*Client, error) {
 		snifferInterval:           DefaultSnifferInterval,
 		snifferStop:               make(chan bool),
 		sendGetBodyAs:             DefaultSendGetBodyAs,
+		cookies:                   make([]http.Cookie, 0),
 	}
 
 	// Run the options on it
@@ -293,6 +295,7 @@ func NewSimpleClient(options ...ClientOptionFunc) (*Client, error) {
 		snifferStop:               make(chan bool),
 		sendGetBodyAs:             DefaultSendGetBodyAs,
 		gzipEnabled:               DefaultGzipEnabled,
+		cookies:                   make([]http.Cookie, 0),
 	}
 
 	// Run the options on it
@@ -358,6 +361,13 @@ func SetURL(urls ...string) ClientOptionFunc {
 		default:
 			c.urls = urls
 		}
+		return nil
+	}
+}
+
+func SetCookies(cookies ...http.Cookie) ClientOptionFunc {
+	return func(c *Client) error {
+		c.cookies = cookies
 		return nil
 	}
 }
@@ -741,6 +751,11 @@ func (c *Client) sniffNode(url string) []*conn {
 	if c.basicAuth {
 		req.SetBasicAuth(c.basicAuthUsername, c.basicAuthPassword)
 	}
+	if len(c.cookies) > 0 {
+		for _,_c := range c.cookies {
+			req.AddCookie(&_c)
+		}
+	}
 	c.mu.RUnlock()
 
 	res, err := c.c.Do((*http.Request)(req))
@@ -849,6 +864,7 @@ func (c *Client) healthcheck(timeout time.Duration, force bool) {
 	basicAuth := c.basicAuth
 	basicAuthUsername := c.basicAuthUsername
 	basicAuthPassword := c.basicAuthPassword
+	cookies := c.cookies
 	c.connsMu.RUnlock()
 
 	timeoutInMillis := int64(timeout / time.Millisecond)
@@ -860,6 +876,11 @@ func (c *Client) healthcheck(timeout time.Duration, force bool) {
 		if err == nil {
 			if basicAuth {
 				req.SetBasicAuth(basicAuthUsername, basicAuthPassword)
+			}
+			if len(cookies) > 0 {
+				for _,c := range cookies {
+					req.AddCookie(&c)
+				}
 			}
 			res, err := c.c.Do((*http.Request)(req))
 			if err == nil {
@@ -891,6 +912,7 @@ func (c *Client) startupHealthcheck(timeout time.Duration) error {
 	basicAuth := c.basicAuth
 	basicAuthUsername := c.basicAuthUsername
 	basicAuthPassword := c.basicAuthPassword
+	cookies := c.cookies
 	c.mu.Unlock()
 
 	// If we don't get a connection after "timeout", we bail.
@@ -909,6 +931,11 @@ func (c *Client) startupHealthcheck(timeout time.Duration) error {
 			}
 			if basicAuth {
 				req.SetBasicAuth(basicAuthUsername, basicAuthPassword)
+			}
+			if len(cookies) > 0 {
+				for _,c := range cookies {
+					req.AddCookie(&c)
+				}
 			}
 			res, err := cl.Do(req)
 			if err == nil && res != nil && res.StatusCode >= 200 && res.StatusCode < 300 {
@@ -989,6 +1016,7 @@ func (c *Client) PerformRequest(method, path string, params url.Values, body int
 	basicAuthPassword := c.basicAuthPassword
 	sendGetBodyAs := c.sendGetBodyAs
 	gzipEnabled := c.gzipEnabled
+	cookies := c.cookies
 	c.mu.RUnlock()
 
 	var err error
@@ -1041,6 +1069,13 @@ func (c *Client) PerformRequest(method, path string, params url.Values, body int
 
 		if basicAuth {
 			req.SetBasicAuth(basicAuthUsername, basicAuthPassword)
+		}
+
+
+		if len(cookies) > 0 {
+			for _,c := range cookies {
+				req.AddCookie(&c)
+			}
 		}
 
 		// Set body

@@ -77,6 +77,7 @@ func (s *PingService) Do() (*PingResult, int, error) {
 	basicAuth := s.client.basicAuth
 	basicAuthUsername := s.client.basicAuthUsername
 	basicAuthPassword := s.client.basicAuthPassword
+	cookies := s.client.cookies
 	s.client.mu.RUnlock()
 
 	url_ := s.url + "/"
@@ -107,6 +108,12 @@ func (s *PingService) Do() (*PingResult, int, error) {
 
 	if basicAuth {
 		req.SetBasicAuth(basicAuthUsername, basicAuthPassword)
+	}
+
+	if len(cookies) > 0 {
+		for _,c := range cookies {
+			req.AddCookie(&c)
+		}
 	}
 
 	res, err := s.client.c.Do((*http.Request)(req))
