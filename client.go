@@ -367,7 +367,12 @@ func SetURL(urls ...string) ClientOptionFunc {
 
 func SetCookies(cookies ...http.Cookie) ClientOptionFunc {
 	return func(c *Client) error {
-		c.cookies = cookies
+		switch len(cookies) {
+		case 0:
+			c.cookies = []http.Cookie{}
+		default:
+			c.cookies = cookies
+		}
 		return nil
 	}
 }
@@ -932,10 +937,8 @@ func (c *Client) startupHealthcheck(timeout time.Duration) error {
 			if basicAuth {
 				req.SetBasicAuth(basicAuthUsername, basicAuthPassword)
 			}
-			if len(cookies) > 0 {
-				for _,c := range cookies {
-					req.AddCookie(&c)
-				}
+			for _,c := range cookies {
+				req.AddCookie(&c)
 			}
 			res, err := cl.Do(req)
 			if err == nil && res != nil && res.StatusCode >= 200 && res.StatusCode < 300 {
